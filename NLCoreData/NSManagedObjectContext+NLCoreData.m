@@ -103,6 +103,9 @@ undoEnabled;
 	 object:self];
 	
 	[self save];
+    
+    [[NSNotificationCenter defaultCenter]
+	 removeObserver:context name:NSManagedObjectContextDidSaveNotification object:self];
 }
 
 - (void)managedObjectContextMerge:(NSNotification *)note
@@ -114,14 +117,11 @@ undoEnabled;
 	NSManagedObjectContext* context			= [NSManagedObjectContext contextForThread:thread];
 	NLCoreDataNotificationBlock	completion	= [dictionary objectForKey:NLCoreDataNotificationBlockKey];
 	
-	[context mergeChangesFromContextDidSaveNotification:note];
 	[dictionary removeObjectForKey:NLCoreDataMergeTargetContextKey];
 	[dictionary removeObjectForKey:NLCoreDataNotificationBlockKey];
 	
-	[[NSNotificationCenter defaultCenter]
-	 removeObserver:context name:NSManagedObjectContextDidSaveNotification object:self];
-	
 	[thread performBlockOnThread:^{
+        [context mergeChangesFromContextDidSaveNotification:note];
 		
 		if (completion)
 			completion(note);
