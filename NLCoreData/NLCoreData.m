@@ -32,6 +32,18 @@ const struct NLCoreDataExceptionsStruct NLCoreDataExceptions = {
 	.merge		= @"Merge Exception"
 };
 
+@interface NLCoreData ()
+
+/**
+ Model name. Set this before use, typically in application:didFinishLaunchingWithOptions:
+ If your data model is named MyDataModel.xcdatamodeld, set modelName to @"MyDataModel".
+ This is optional. If not explicitly set, NLCoreData uses CFBundleName for the main bundle.
+ E.g., if the app is named "MyApp", the model should be named "MyApp".
+ */
+@property (strong, nonatomic) NSString*	modelName;
+
+@end
+
 #pragma mark -
 @implementation NLCoreData
 
@@ -42,13 +54,42 @@ managedObjectModel	= managedObjectModel_;
 
 #pragma mark - Lifecycle
 
-+ (NLCoreData *)shared
-{
-	static dispatch_once_t onceToken;
+static NSMutableDictionary *dictionaryOfCoreDataManagers;
+static NSMutableDictionary *dictionaryOfEntitiesToModel;
+
++ (void)initialize {
+    dictionaryOfCoreDataManagers = [[NSMutableDictionary alloc] init];
+    dictionaryOfEntitiesToModel = [[NSMutableDictionary alloc] init];
+}
+
++ (void)initializeModels:(NSArray *)modelNames {
+    [modelNames enumerateObjectsUsingBlock:^(NSString *model, NSUInteger idx, BOOL *stop) {
+        [NLCoreData sharedForModel:model];
+    }];
+}
+
++ (NLCoreData *)sharedForModel:(NSString *)modelName {
 	__strong static id NLCoreDataSingleton_ = nil;
 	
-	dispatch_once(&onceToken, ^{ NLCoreDataSingleton_ = [[self alloc] init]; });
+    if ([dictionaryOfCoreDataManagers objectForKey:modelName]) {
+        return [dictionaryOfCoreDataManagers objectForKey:modelName];
+    }
+    
+    NLCoreDataSingleton_ = [[self alloc] init];
+    [NLCoreDataSingleton_ setModelName:modelName];
+    [dictionaryOfCoreDataManagers setObject:NLCoreDataSingleton_
+                                     forKey:modelName];
+    
+    for (NSEntityDescription *description in [[NLCoreDataSingleton_ managedObjectModel] entities]) {
+        [dictionaryOfEntitiesToModel setObject:modelName forKey:description.name];
+    }
+    
+    
 	return NLCoreDataSingleton_;
+}
+
++ (NSString *)modelForEntityName:(NSString *)entityName {
+    return [dictionaryOfEntitiesToModel objectForKey:entityName];
 }
 
 - (void)usePreSeededFile:(NSString *)filePath
