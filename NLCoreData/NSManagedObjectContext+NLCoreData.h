@@ -41,14 +41,14 @@ typedef void(^NLCoreDataNotificationBlock)(NSNotification* note);
  @name Lifecycle
  @return The shared context for current thread. Lazily loaded if non-existant.
  */
-+ (NSManagedObjectContext *)contextForThread;
++ (NSManagedObjectContext *)contextForThreadWithEntity:(Class)entity;
 
 /**
  @name Lifecycle
  Use if you want the shared context for another thread.
  @return The shared context for specified thread. Lazily loaded if non-existant.
  */
-+ (NSManagedObjectContext *)contextForThread:(NSThread *)thread;
++ (NSManagedObjectContext *)contextForThread:(NSThread *)thread withEntity:(Class)entity;
 
 #pragma mark - Notifications
 
@@ -57,7 +57,7 @@ typedef void(^NLCoreDataNotificationBlock)(NSNotification* note);
  Merges receiver with another context.
  @parameter completion Optional block to run after merge.
  */
-- (void)mergeWithContextOnThread:(NSThread *)thread completion:(void (^)(NSNotification* note))completion;
+- (void)mergeWithContext:(NSManagedObjectContext *)context onThread:(NSThread *)thread completion:(void (^)(NSNotification *))completion;
 
 #pragma mark - Properties
 

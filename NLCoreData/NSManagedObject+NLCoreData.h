@@ -125,4 +125,10 @@
 + (void)fetchAsynchronouslyWithRequest:(void (^)(NSFetchRequest* request))block
 							completion:(void (^)(NSArray* objects))completion;
 
+/**
+ Similar to the above message except the completion block is called in the background thread that fetched the objects
+ */
++ (void)fetchAsynchronouslyForBackgroundProcessingWithRequest:(void (^)(NSFetchRequest* request))block
+                                                   completion:(void (^)(NSArray* objects))completion;
+
 @end

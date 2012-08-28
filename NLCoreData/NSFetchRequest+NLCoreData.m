@@ -30,7 +30,7 @@
 
 + (NSFetchRequest *)fetchRequestWithEntity:(Class)entity
 {
-	return [self fetchRequestWithEntity:entity context:[NSManagedObjectContext contextForThread]];
+	return [self fetchRequestWithEntity:entity context:[NSManagedObjectContext contextForThreadWithEntity:entity]];
 }
 
 + (NSFetchRequest *)fetchRequestWithEntity:(Class)entity context:(NSManagedObjectContext *)context

@@ -37,7 +37,7 @@
 				  cacheName:(NSString *)cacheName
 {
 	return [[self alloc] initWithFetchRequest:request
-						 managedObjectContext:[NSManagedObjectContext contextForThread]
+						 managedObjectContext:[NSManagedObjectContext contextForThreadWithEntity:NSClassFromString(request.entityName)]
 						   sectionNameKeyPath:keyPath
 									cacheName:cacheName];
 }
