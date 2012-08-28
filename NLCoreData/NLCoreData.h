@@ -52,14 +52,6 @@ extern const struct NLCoreDataExceptionsStruct
 @interface NLCoreData : NSObject
 
 /**
- Model name. Set this before use, typically in application:didFinishLaunchingWithOptions:
- If your data model is named MyDataModel.xcdatamodeld, set modelName to @"MyDataModel".
- This is optional. If not explicitly set, NLCoreData uses CFBundleName for the main bundle.
- E.g., if the app is named "MyApp", the model should be named "MyApp".
- */
-@property (strong, nonatomic) NSString*	modelName;
-
-/**
  Whether or not the store exists. This is likely NO before it's used the first time only.
  Use it to check if the store needs to be seeded.
  */
@@ -90,11 +82,13 @@ extern const struct NLCoreDataExceptionsStruct
 
 #pragma mark - Lifecycle
 
++ (void)initializeModels:(NSArray *)modelNames;
 /**
  @name Lifecycle
  The shared instance. Use this, not alloc/init.
  */
-+ (NLCoreData *)shared;
++ (NLCoreData *)sharedForModel:(NSString *)modelName;
++ (NSString *)modelForEntityName:(NSString *)entityName;
 
 /**
  @name Lifecycle

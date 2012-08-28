@@ -26,8 +26,7 @@
 - (void)setUp
 {
 	[super setUp];
-	
-	[[NLCoreData shared] setModelName:@"CoreDataStore"];
+	[NLCoreData initializeModels:[NSArray arrayWithObject:@"CoreDataStore"]];
 }
 
 - (void)tearDown
@@ -42,9 +41,9 @@
 
 - (void)testContext
 {
-	NSManagedObjectContext* context = [NSManagedObjectContext contextForThread];
+	NSManagedObjectContext* context = [NSManagedObjectContext contextForThreadWithEntity:[User class]];
 	
-	STAssertTrue(context && context == [NSManagedObjectContext contextForThread:[NSThread currentThread]], @"");
+	STAssertTrue(context && context == [NSManagedObjectContext contextForThread:[NSThread currentThread] withEntity:[User class]], @"");
 }
 
 - (void)testInsert
@@ -82,19 +81,47 @@
 	
 	dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
 		
-		NSManagedObjectContext* context = [NSManagedObjectContext contextForThread];
+		NSManagedObjectContext* context = [NSManagedObjectContext contextForThreadWithEntity:[User class]];
 		[User deleteWithPredicate:nil];
 		
 		STAssertTrue([User countWithPredicate:nil] == 0, @"");
 		[User insert];
 		STAssertTrue([User countWithPredicate:nil] == 1, @"");
 		
-		[context mergeWithContextOnThread:[NSThread mainThread] completion:^(NSNotification *note) {
+		[context mergeWithContext:[NSManagedObjectContext contextForThread:[NSThread mainThread] withEntity:[User class]] onThread:[NSThread mainThread] completion:^(NSNotification *note) {
 			
 			STAssertTrue([[NSThread currentThread] isMainThread], @"not on main thread");
 			STAssertTrue([User countWithPredicate:nil] == 1, @"contexts not merged");
 		}];
 	});
+}
+
+- (void)testAsyncFetchWithBackgroundProcessing
+{
+    [self deleteUsers];
+    [self seedUsers:1];
+    [[NSManagedObjectContext contextForThreadWithEntity:[User class]] save];
+    
+    [User fetchAsynchronouslyForBackgroundProcessingWithRequest:^(NSFetchRequest *request) {
+
+    } completion:^(NSArray *objects) {
+        STAssertTrue(! [[NSThread currentThread] isMainThread], @"should not be on main thread");
+        STAssertTrue([objects count] == 1, @"background fetch failed");
+    }];
+}
+
+- (void)testAsyncFetching
+{
+    [self deleteUsers];
+    [self seedUsers:1];
+    [[NSManagedObjectContext contextForThreadWithEntity:[User class]] save];
+    
+    [User fetchAsynchronouslyWithRequest:^(NSFetchRequest *request) {
+        
+    } completion:^(NSArray *objects) {
+        STAssertTrue([[NSThread currentThread] isMainThread], @"on main thread");
+        STAssertTrue([objects count] == 1, @"background fetch failed");
+    }];
 }
 
 #pragma mark - Helpers

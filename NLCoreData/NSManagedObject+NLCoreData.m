@@ -58,7 +58,7 @@
 
 + (id)insert
 {
-	return [self insertInContext:[NSManagedObjectContext contextForThread]];
+	return [self insertInContext:[NSManagedObjectContext contextForThreadWithEntity:[self class]]];
 }
 
 + (id)insertInContext:(NSManagedObjectContext *)context
@@ -76,20 +76,12 @@
 
 + (void)deleteWithRequest:(void (^)(NSFetchRequest* request))block
 {
-	[self deleteWithRequest:block context:[NSManagedObjectContext contextForThread]];
+	[self deleteWithRequest:block context:[NSManagedObjectContext contextForThreadWithEntity:[self class]]];
 }
 
 + (void)deleteWithRequest:(void (^)(NSFetchRequest* request))block context:(NSManagedObjectContext *)context
 {
-	NSFetchRequest* request = [NSFetchRequest fetchRequestWithEntity:[self class]];
-	
-	if (block)
-		block(request);
-	
-	[request setIncludesPropertyValues:NO];
-	[request setIncludesSubentities:NO];
-	
-	NSArray* objects = [self fetchWithRequest:nil context:context];
+	NSArray* objects = [self fetchWithRequest:block context:context];
 	
 	for (NSManagedObject* object in objects)
 		[context deleteObject:object];
@@ -127,7 +119,7 @@
 		if (predicate)
 			[request setPredicate:predicate];
 		
-	} context:[NSManagedObjectContext contextForThread]];
+	} context:[NSManagedObjectContext contextForThreadWithEntity:[self class]]];
 }
 
 #pragma mark - Counting
@@ -136,12 +128,12 @@
 {
 	SET_PREDICATE_WITH_VARIADIC_ARGS
 	return [self countWithRequest:^(NSFetchRequest *request) { [request setPredicate:predicate]; }
-						  context:[NSManagedObjectContext contextForThread]];
+						  context:[NSManagedObjectContext contextForThreadWithEntity:[self class]]];
 }
 
 + (NSUInteger)countWithRequest:(void (^)(NSFetchRequest* request))block
 {
-	return [self countWithRequest:block context:[NSManagedObjectContext contextForThread]];
+	return [self countWithRequest:block context:[NSManagedObjectContext contextForThreadWithEntity:[self class]]];
 }
 
 + (NSUInteger)countWithRequest:(void (^)(NSFetchRequest* request))block context:(NSManagedObjectContext *)context
@@ -166,7 +158,7 @@
 
 + (id)fetchWithObjectID:(NSManagedObjectID *)objectID
 {
-	return [self fetchWithObjectID:objectID context:[NSManagedObjectContext contextForThread]];
+	return [self fetchWithObjectID:objectID context:[NSManagedObjectContext contextForThreadWithEntity:[self class]]];
 }
 
 + (id)fetchWithObjectID:(NSManagedObjectID *)objectID context:(NSManagedObjectContext *)context
@@ -189,12 +181,12 @@
 
 + (NSArray *)fetchWithRequest:(void (^)(NSFetchRequest* request))block
 {
-	return [self fetchWithRequest:block context:[NSManagedObjectContext contextForThread]];
+	return [self fetchWithRequest:block context:[NSManagedObjectContext contextForThreadWithEntity:[self class]]];
 }
 
 + (NSArray *)fetchWithRequest:(void (^)(NSFetchRequest* request))block context:(NSManagedObjectContext *)context
 {
-	NSFetchRequest* request = [NSFetchRequest fetchRequestWithEntity:[self class]];
+	NSFetchRequest* request = [NSFetchRequest fetchRequestWithEntity:[self class] context:context];
 	
 	if (block)
 		block(request);
@@ -237,7 +229,7 @@
 		if (predicate)
 			[request setPredicate:predicate];
 		
-	} context:[NSManagedObjectContext contextForThread]];
+	} context:[NSManagedObjectContext contextForThreadWithEntity:[self class]]];
 }
 
 + (NSArray *)fetchSingle:(NSUInteger)index withPredicate:(id)predicateOrString, ...
@@ -288,39 +280,64 @@
 		[NSException raise:NLCoreDataExceptions.parameter format:@"completion block cannot be nil"];
 #endif
 	
-	NSThread* thread = [NSThread currentThread];
-	
-	dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-		
-		NSManagedObjectContext* context = [NSManagedObjectContext contextForThread];
-		NSFetchRequest* idRequest		= [NSFetchRequest fetchRequestWithEntity:[self class] context:context];
-		
+	NSManagedObjectContext *child = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+    [child setParentContext:[NSManagedObjectContext contextForThread:[NSThread mainThread] withEntity:[self class]]];
+    
+    [child performBlock:^{
+        NSFetchRequest* idRequest = [NSFetchRequest fetchRequestWithEntity:[self class] context:child];
+        
 		if (block)
 			block(idRequest);
-		
+        
 		[idRequest setResultType:NSManagedObjectIDResultType];
 		[idRequest setSortDescriptors:nil];
-		
+        
 		NSError* idError;
-		NSArray* objectIDs = [context executeFetchRequest:idRequest error:&idError];
-		
-		[thread performBlockOnThread:^{
-			
-			NSPredicate* predicate = [NSPredicate predicateWithFormat:@"SELF IN %@", objectIDs];
-			NSFetchRequest* objRequest = [NSFetchRequest fetchRequestWithEntity:[self class]];
-			
+		NSArray* objectIDs = [child executeFetchRequest:idRequest error:&idError];
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSPredicate *predicate = [NSPredicate predicateWithFormat:@"SELF IN %@", objectIDs];
+			NSFetchRequest *objRequest = [NSFetchRequest fetchRequestWithEntity:[self class]];
+            
 			if (block)
 				block(objRequest);
-			
+            
 			[objRequest setPredicate:predicate];
-			
+            
 			NSError* objError;
-			NSArray* objects = [[NSManagedObjectContext contextForThread]
+			NSArray* objects = [[NSManagedObjectContext contextForThreadWithEntity:[self class]]
 								executeFetchRequest:objRequest error:&objError];
-			
-			completion(objects);
-		}];
-	});
+            
+            completion(objects);
+        });
+    }];
+    
+}
+
++ (void)fetchAsynchronouslyForBackgroundProcessingWithRequest:(void (^)(NSFetchRequest* request))block
+                                                   completion:(void (^)(NSArray* objects))completion
+{
+#ifdef DEBUG
+	if (!completion)
+		[NSException raise:NLCoreDataExceptions.parameter format:@"completion block cannot be nil"];
+#endif
+	
+	NSManagedObjectContext *child = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+    [child setParentContext:[NSManagedObjectContext contextForThreadWithEntity:[self class]]];
+    
+    [child performBlock:^{
+        NSFetchRequest* request = [NSFetchRequest fetchRequestWithEntity:[self class] context:child];
+        
+		if (block)
+			block(request);
+        
+		NSError* objError;
+        NSArray* objects = [[NSManagedObjectContext contextForThreadWithEntity:[self class]]
+                            executeFetchRequest:request error:&objError];
+        
+        completion(objects);
+    }];
+
 }
 
 @end
