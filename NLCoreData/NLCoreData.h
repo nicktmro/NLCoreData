@@ -85,6 +85,11 @@ extern const struct NLCoreDataExceptionsStruct
 + (void)initializeModels:(NSArray *)modelNames;
 /**
  @name Lifecycle
+ Use this when there's only one context
+ */
++ (NLCoreData *)shared;
+/**
+ @name Lifecycle
  The shared instance. Use this, not alloc/init.
  */
 + (NLCoreData *)sharedForModel:(NSString *)modelName;

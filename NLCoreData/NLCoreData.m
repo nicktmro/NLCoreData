@@ -68,6 +68,28 @@ static NSMutableDictionary *dictionaryOfEntitiesToModel;
     }];
 }
 
++ (NLCoreData *)shared {
+
+    NSInteger countOfContexts = [dictionaryOfCoreDataManagers count];
+    if (countOfContexts == 1) {
+        return [[dictionaryOfCoreDataManagers allValues] objectAtIndex:0];
+    }
+    else if (countOfContexts == 0) {
+        //-- create one
+        NLCoreData *singleton = [[self alloc] init];
+        [dictionaryOfCoreDataManagers setObject:singleton forKey:[singleton modelName]];
+        return singleton;
+    }
+    else {
+#ifdef DEBUG
+		[NSException raise:@"You must use sharedForModel: and specify the model name" format:nil, nil];
+#endif
+        
+        return nil;
+    }
+
+}
+
 + (NLCoreData *)sharedForModel:(NSString *)modelName {
 	__strong static id NLCoreDataSingleton_ = nil;
 	
